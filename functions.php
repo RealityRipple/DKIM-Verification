@@ -11,6 +11,32 @@
   return $ok;
  }
 
+ function dkim_dns_clean_ret($ret)
+ {
+  if (strpos($ret, '"') === false && strpos($ret, '\\') === false)
+   return $ret;
+  $ret = str_replace('\\;', ';', $ret);
+  $ret = str_replace('" "', '', $ret);
+  return str_replace('"', '', $ret);
+ }
+
+ function dkim_dns_get_txt($domain)
+ {
+  $out = null;
+  $ret = null;
+  exec("dig -t txt +short $domain", $out, $ret);
+  if ($ret !== 0)
+   return false;
+  if (count($out) === 0)
+   return false;
+  $fRet = array();
+  foreach ($out as $rL)
+  {
+   $fRet[] = dkim_dns_clean_ret($rL);
+  }
+  return $fRet;
+ }
+
  function dkim_check_configuration_do()
  {
   global $openssl_cmds;
@@ -54,20 +80,91 @@
   return false;
  }
 
+ function dkim_dns_policy($host)
+ {
+  $ret = dkim_dns_get_txt($host, DNS_TXT);
+  if ($ret === false)
+   return false;
+  if (count($ret) < 1)
+   return false;
+  $results = array();
+  foreach ($ret as $record)
+  {
+   $recVals = array();
+   if (strpos($record, ';') !== false)
+   {
+    $recLine = explode(';', $record);
+    foreach ($recLine as $kv)
+    {
+     if (empty($kv))
+      continue;
+     if (strpos($kv, '=') === false)
+      continue;
+     list($lKey, $lVal) = explode('=', $kv, 2);
+     $lKey = strtolower(str_replace(' ', '',$lKey));
+     $lVal = str_replace(' ',  '', $lVal);
+     if (!array_key_exists($lKey, $recVals))
+      $recVals[$lKey] = array();
+     $recVals[$lKey][] = $lVal;
+    }
+   }
+   else
+   {
+    if (empty($record))
+     continue;
+    if (strpos($record, '=') === false)
+     continue;
+    list($lKey, $lVal) = explode('=', $record, 2);
+    $lKey = strtolower(str_replace(' ', '',$lKey));
+    $lVal = str_replace(' ',  '', $lVal);
+    if (!array_key_exists($lKey, $recVals))
+     $recVals[$lKey] = array();
+    $recVals[$lKey][] = $lVal;
+   }
+   if (!array_key_exists('o', $recVals))
+    continue;
+   foreach ($recVals['o'] as $recSvc)
+   {
+    if (strpos($recSvc, ':') === false)
+     $results[] = $recSvc;
+    else
+     array_push($results, explode(':', $recSvc));
+   }
+  }
+  if (count($results) > 0)
+  {
+   foreach ($results as $ret)
+   {
+    if ($ret === '.')
+     return '.';
+   }
+   foreach ($results as $ret)
+   {
+    if ($ret === '!')
+     return '!';
+   }
+   foreach ($results as $ret)
+   {
+    if ($ret === '-')
+     return '-';
+   }
+  }
+  return '~';
+ }
+
  function dkim_dns_record($host, &$acceptedHashes, &$strict)
  {
   $noKey = false;
   $acceptedHashes = null;
   $strict = false;
-  $ret = dns_get_record($host, DNS_TXT);
+  $ret = dkim_dns_get_txt($host, DNS_TXT);
   if ($ret === false)
    return false;
   if (count($ret) < 1)
    return false;
   $pubKeys = array();
-  foreach ($ret as $tRet)
+  foreach ($ret as $record)
   {
-   $record = $tRet['txt'];
    $recVals = array();
    if (strpos($record, ';') !== false)
    {
@@ -275,6 +372,12 @@
    list($lKey, $lVal) = explode('=', $dkimHeader, 2);
    $dkimVals[strtolower(str_replace(' ', '',$lKey))] = str_replace(' ',  '', $lVal);
   }
+  $domain = '';
+  if (array_key_exists('d', $dkimVals))
+   $domain = $dkimVals['d'];
+  if (empty($domain))
+   return 0x1001;
+  $signerDomain = $domain;
   $algos = 'rsa-sha256';
   if (array_key_exists('a', $dkimVals))
    $algos = $dkimVals['a'];
@@ -284,12 +387,6 @@
    $hAlgo = $algos;
   else
    list($sAlgo, $hAlgo) = explode('-', $algos, 2);
-  $domain = '';
-  if (array_key_exists('d', $dkimVals))
-   $domain = $dkimVals['d'];
-  if (empty($domain))
-   return 0x1001;
-  $signerDomain = $domain;
   $selector = '';
   if (array_key_exists('s', $dkimVals))
    $selector = $dkimVals['s'];
@@ -456,6 +553,13 @@
    $str.= _(" - ")._("No compatible key type");
   if (($retval & 0x20000) == 0x20000)
    $str.= _(" - ")._("No compatible hash algorithm");
+  if (($retval & 0x100000) == 0x100000)
+   $str.= _(" - ")._("Domain does not send mail");
+  if (($retval & 0x200000) == 0x200000)
+   $str.= _(" - ")._("Domain requires signature");
+  if (($retval & 0x400000) == 0x400000)
+   $str.= _(" - ")._("Signed by third-party");
+  
   sq_change_text_domain('squirrelmail');
   return $str;
  }
@@ -497,67 +601,132 @@
   return $hdrs;
  }
 
+ function dkim_display($domain, $retval, $retstr = null)
+ {
+  global $row_highlite_color;
+  sq_change_text_domain('dkim');
+  if (($retval & 0x0F) == 0)
+   $sign_verified = true;
+  else
+   $sign_verified = false;
+  if ($retstr === null)
+   $retstr = convert_dkim_verify_result_to_displayable_text($retval);
+  if (check_sm_version(1, 5, 2))
+  {
+   global $oTemplate;
+   $oTemplate->assign('dkim_row_highlite_color', $row_highlite_color);
+   $oTemplate->assign('dkim_sign_domain', $domain);
+   $oTemplate->assign('dkim_sign_verified', $sign_verified);
+   $oTemplate->assign('dkim_sign_result', $retstr, FALSE);
+   $output = $oTemplate->fetch('plugins/dkim/dkim.tpl');
+  }
+  else
+  {
+   $colortag1 = '';
+   $colortag2 = '';
+   if (!$sign_verified)
+   {
+    $colortag1 = "<font color=\"$color[2]\"><b>";
+    $colortag2 = '</b></font>';
+   }
+   $output = "      <tr bgcolor=\"$row_highlite_color\">\n"
+           . "        <td width=\"20%\" align=\"right\" valign=\"top\">\n<b>"
+           . $domain . _(" DKIM")
+           . "        </b></td><td width=\"80%\" align=\"left\" valign=\"top\">\n"
+           . "          $colortag1 $retstr$colortag2\n"
+           . "        </td>\n"
+           . "      </tr>\n";
+  }
+  sq_change_text_domain('squirrelmail');
+  return $output;
+ }
+
  function dkim_header_verify_do()
  {
   global $imapConnection, $passed_id, $color, $message,
          $mailbox, $where, $what, $startMessage,
          $row_highlite_color;
   $headerList = dkim_header_data();
-  if (!array_key_exists('dkim-signature', $headerList))
-   return;
-  dkim_working_directory_init();
-  $body = dkim_fetch_full_body($imapConnection, $passed_id);
+  $fromList = array();
+  $dnsPols = array();
   $output = '';
-  foreach ($headerList['dkim-signature'] as $headerSig)
+  if (array_key_exists('from', $headerList))
   {
-   $signerDomain = null;
-   if (strpos($body, "\r\n\r\n") === false)
+   foreach ($headerList['from'] as $fromAddr)
    {
-    $retval = 6;
-    $sign_result = "Error Reading Message: $body";
+    if (empty($fromAddr))
+     continue;
+    if (strpos($fromAddr, '@') === false)
+     continue;
+    $fDomain = substr($fromAddr, strpos($fromAddr, '@') + 1);
+    $fromList[] = strtolower($fDomain);
+    $dPol = dkim_dns_policy('_domainkey.'.$fDomain);
+    $dnsPols[strtolower($fDomain)] = $dPol;
+    if ($dPol === '.')
+     $output.= dkim_display($fDomain, 0x100001);
    }
-   else
+  }
+  if (!array_key_exists('dkim-signature', $headerList))
+  {
+   if (count($dnsPols) > 0)
    {
-    $hdrs = substr($body, 0, strpos($body, "\r\n\r\n") + 2);
-    $bOut = substr($body, strpos($body, "\r\n\r\n") + 4);
-    $retval = verify_dkim($headerSig, $hdrs, $bOut, $signerDomain);
-    $sign_result = convert_dkim_verify_result_to_displayable_text($retval);
-   }
-   sq_change_text_domain('dkim');
-   if ($retval < 3)
-    $sign_verified = TRUE;
-   else
-    $sign_verified = FALSE;
-   if (check_sm_version(1, 5, 2))
-   {
-    global $oTemplate;
-    $oTemplate->assign('dkim_row_highlite_color', $row_highlite_color);
-    $oTemplate->assign('dkim_sign_domain', $signerDomain);
-    $oTemplate->assign('dkim_sign_verified', $sign_verified);
-    $oTemplate->assign('dkim_sign_result', $sign_result, FALSE);
-    $output.= $oTemplate->fetch('plugins/dkim/dkim.tpl');
-   }
-   else
-   {
-    $colortag1 = '';
-    $colortag2 = '';
-    if (!$sign_verified)
+    foreach ($dnsPols as $dPol)
     {
-       $colortag1 = "<font color=\"$color[2]\"><b>";
-       $colortag2 = '</b></font>';
+     if ($dPol === '-' || $dPol === '!')
+     {
+      $output.= dkim_display($fDomain, 0x200001);
+      break;
+     }
     }
-    echo "      <tr bgcolor=\"$row_highlite_color\">\n"
-       . "        <td width=\"20%\" align=\"right\" valign=\"top\">\n<b>"
-       . _("DKIM")
-       . "        </b></td><td width=\"80%\" align=\"left\" valign=\"top\">\n"
-       . "          $colortag1 $sign_result$colortag2\n"
-       . "        </td>\n"
-       . "      </tr>\n";
    }
-   sq_change_text_domain('squirrelmail');
+  }
+  else
+  {
+   dkim_working_directory_init();
+   $body = dkim_fetch_full_body($imapConnection, $passed_id);
+   foreach ($headerList['dkim-signature'] as $headerSig)
+   {
+    $signerDomain = null;
+    if (strpos($body, "\r\n\r\n") === false)
+    {
+     $retval = 6;
+     $sign_result = "Error Reading Message: $body";
+     $output.= dkim_display('', $retval, $sign_result);
+    }
+    else
+    {
+     $hdrs = substr($body, 0, strpos($body, "\r\n\r\n") + 2);
+     $bOut = substr($body, strpos($body, "\r\n\r\n") + 4);
+     $retval = verify_dkim($headerSig, $hdrs, $bOut, $signerDomain);
+     if (!array_key_exists(strtolower($signerDomain), $dnsPols))
+     {
+      $dPol = dkim_dns_policy('_domainkey.'.$signerDomain);
+      $dnsPols[strtolower($signerDomain)] = $dPol;
+     }
+     else
+      $dPol = $dnsPols[strtolower($signerDomain)];
+     if ($dPol === '!')
+     {
+      if (($retval & 0x0F) > 0)
+       $retval |= 0x200000;
+      else if (!in_array(strtolower($signerDomain), $fromList))
+       $retval |= 0x400000;
+     }
+     else if ($dPol === '.')
+     {
+      if (($retval & 0x0F) > 0)
+       $retval |= 0x200000;
+     }
+     $output.= dkim_display($signerDomain, $retval);
+    }
+   }
   }
   if ($output !== '')
-   return array('read_body_header' => $output);
+  {
+   if (check_sm_version(1, 5, 2))
+    return array('read_body_header' => $output);
+   echo $output;
+  }
  }
 
  function dkim_working_directory_init()

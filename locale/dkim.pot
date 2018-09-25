@@ -49,5 +49,14 @@ msgstr ""
 msgid "No compatible hash algorithm"
 msgstr ""
 
+msgid "Domain does not send mail"
+msgstr ""
+
+msgid "Domain requires signature"
+msgstr ""
+
+msgid "Signed by third-party"
+msgstr ""
+
 msgid " - "
 msgstr ""
