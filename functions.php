@@ -106,7 +106,7 @@
    }
    if (array_key_exists('k', $recVals))
    {
-    if ($recVals['k'] !== 'rsa' && $recVals['k'] !== 'dsa' && $recVals['k'] !== 'ecdsa256' && $recVals['k'] !=== 'ecdsa384' && $recVals['k'] !== 'ecdsa521')
+    if ($recVals['k'] !== 'rsa' && $recVals['k'] !== 'dsa' && $recVals['k'] !== 'ecdsa256' && $recVals['k'] !== 'ecdsa384' && $recVals['k'] !== 'ecdsa521')
     {
      $noKey = true;
      continue;
