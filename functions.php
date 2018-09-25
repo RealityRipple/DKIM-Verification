@@ -54,8 +54,10 @@
   return false;
  }
 
- function dkim_dns_record($host)
+ function dkim_dns_record($host, &$acceptedHashes, &$strict)
  {
+  $acceptedHashes = null;
+  $strict = false;
   $ret = dns_get_record($host, DNS_TXT);
   if ($ret === false)
    return false;
@@ -64,10 +66,62 @@
   foreach ($ret as $tRet)
   {
    $record = $tRet['txt'];
-   if (strpos($record, 'p=') === false)
+   $recVals = array();
+   if (strpos($record, ';') !== false)
+   {
+    $recLine = explode(';', $record);
+    foreach ($recLine as $kv)
+    {
+     if (empty($kv))
+      continue;
+     if (strpos($kv, '=') === false)
+      continue;
+     list($lKey, $lVal) = explode('=', $kv, 2);
+     $recVals[strtolower(str_replace(' ', '',$lKey))] = str_replace(' ',  '', $lVal);
+    }
+   }
+   else
+   {
+    if (empty($record))
+     continue;
+    if (strpos($record, '=') === false)
+     continue;
+    list($lKey, $lVal) = explode('=', $record, 2);
+    $recVals[strtolower(str_replace(' ', '',$lKey))] = str_replace(' ',  '', $lVal);
+   }
+   if (!array_key_exists('p', $recVals))
     continue;
-   if (strpos($record, 'v=') !== false && substr($record, strpos($record, 'v=') + 2, 6) !== 'DKIM1;')
+   if (array_key_exists('v', $recVals) && $recVals['v'] !== 'DKIM1')
     continue;
+   if (array_key_exists('s', $recVals))
+   {
+    $services = array();
+    if (strpos($recVals['s'], ':') === false)
+     $services[] = $recVals['s'];
+    else
+     $services = explode(':', $recVals['s']);
+    if (!in_array('*', $services) && !in_array('email', $services))
+     continue;
+   }
+   if (array_key_exists('h', $recVals))
+   {
+    $hashTypes = array();
+    if (strpos($recVals['h'], ':') === false)
+     $hashTypes[] = $recVals['h'];
+    else
+     $hashTypes = explode(':', $recVals['h']);
+    $acceptedHashes = $hashTypes;
+   }
+   if (array_key_exists('t', $recVals))
+   {
+    $flags = array();
+    if (strpos($recVals['t'], ':') === false)
+     $flags[] = $recVals['t'];
+    else
+     $flags = explode(':', $recVals['t']);
+    if (in_array('s', $flags))
+     $strict = true;
+   }
    $record = substr($record, strpos($record, 'p=') + 2);
    if (strpos($record, ';') !== false)
     $record = substr($record, 0, strpos($record, ';'));
