@@ -61,14 +61,18 @@
    return false;
   if (count($ret) < 1)
    return false;
-  $record = $ret[0]['txt'];
-  if (strpos($record, 'p=') === false)
-   return false;
-  $record = substr($record, strpos($record, 'p=') + 2);
-  if (strpos($record, ';') !== false)
-   $record = substr($record, 0, strpos($record, ';'));
-  $record = wordwrap($record, 64, "\r\n", true);
-  return "-----BEGIN PUBLIC KEY-----\r\n$record\r\n-----END PUBLIC KEY-----\r\n";
+  foreach ($ret as $tRet)
+  {
+   $record = $tRet['txt'];
+   if (strpos($record, 'p=') === false)
+    continue;
+   $record = substr($record, strpos($record, 'p=') + 2);
+   if (strpos($record, ';') !== false)
+    $record = substr($record, 0, strpos($record, ';'));
+   $record = wordwrap($record, 64, "\r\n", true);
+   return "-----BEGIN PUBLIC KEY-----\r\n$record\r\n-----END PUBLIC KEY-----\r\n";
+  }
+  return false;
  }
 
  function dkim_canon_body($canon, $body, $length)
