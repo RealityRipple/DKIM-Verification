@@ -260,7 +260,7 @@
   $hAlgo = 'sha256';
   $sAlgo = 'rsa';
   if (strpos($algos, '-') === false)
-   $sAlgo = $algos;
+   $hAlgo = $algos;
   else
    list($sAlgo, $hAlgo) = explode('-', $algos, 2);
   $domain = '';
