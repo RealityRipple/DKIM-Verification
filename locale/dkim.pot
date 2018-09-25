@@ -36,3 +36,12 @@ msgstr ""
 
 msgid "Unverified - DNS record unavailable"
 msgstr ""
+
+msgid "Invalid - Strict domain failure"
+msgstr ""
+
+msgid "Invalid - No compatible key type"
+msgstr ""
+
+msgid "Invalid - No compatible hash algorithm"
+msgstr ""

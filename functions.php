@@ -379,6 +379,9 @@
    case 5: $str = _("Invalid - Signature is invalid"); break;
    case 6: $str = _("Unverified"); break;
    case 7: $str = _("Unverified - DNS record unavailable"); break;
+   case 8: $str = _("Invalid - Strict domain failure"); break;
+   case 9: $str = _("Invalid - No compatible key type"); break;
+   case 10: $str = _("Invalid - No compatible hash algorithm"); break;
   }
   sq_change_text_domain('squirrelmail');
   return $str;
