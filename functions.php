@@ -146,12 +146,12 @@
  {
   if ($canon === 'r')
   {
-   while (strpos($body, " \r\n") !== false)
-    $body = str_replace(" \r\n", "\r\n", $body);
    while (strpos($body, "\t") !== false)
     $body = str_replace("\t", " ", $body);
    while (strpos($body, "  ") !== false)
     $body = str_replace("  ", " ", $body);
+   while (strpos($body, " \r\n") !== false)
+    $body = str_replace(" \r\n", "\r\n", $body);
    while (substr($body, -2) === "\r\n")
     $body = substr($body, 0, -2);
    if (!empty($body))
