@@ -167,14 +167,26 @@
    $tmp_dir .= '/';
   dkim_init();
   $dkimVals = array();
-  $dkimLine = explode('; ', $dkimHeader);
-  foreach ($dkimLine as $kv)
+  if (strpos($dkimHeader, ';') !== false)
   {
-   if (empty($kv))
+   $dkimLine = explode(';', $dkimHeader);
+   foreach ($dkimLine as $kv)
+   {
+    if (empty($kv))
+     continue;
+    if (strpos($kv, '=') === false)
+     continue;
+    list($lKey, $lVal) = explode('=', $kv, 2);
+    $dkimVals[strtolower(str_replace(' ', '',$lKey))] = str_replace(' ',  '', $lVal);
+   }
+  }
+  else
+  {
+   if (empty($dkimHeader))
     continue;
-   if (strpos($kv, '=') === false)
+   if (strpos($dkimHeader, '=') === false)
     continue;
-   list($lKey, $lVal) = explode('=', $kv, 2);
+   list($lKey, $lVal) = explode('=', $dkimHeader, 2);
    $dkimVals[strtolower(str_replace(' ', '',$lKey))] = str_replace(' ',  '', $lVal);
   }
   $algos = 'rsa-sha256';
