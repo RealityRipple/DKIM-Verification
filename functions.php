@@ -224,10 +224,11 @@
   return $hRet;
  }
 
- function verify_dkim($dkimHeader, $headers_in, $message_in)
+ function verify_dkim($dkimHeader, $headers_in, $message_in, &$signerDomain)
  {
   global $openssl_cmds, $message;
   global $tmp_dir;
+  $signerDomain = null;
   if (substr($tmp_dir, -1) !== '/')
    $tmp_dir .= '/';
   dkim_init();
@@ -332,13 +333,31 @@
    $canonHeader = dkim_canon_header('r', $headers_in, $hOrder);
   else
    $canonHeader = dkim_canon_header('s', $headers_in, $hOrder);
-
-  $pubKey = dkim_dns_record($selector.'._domainkey.'.$domain);
+  $dkimStrict = false;
+  $dkimAlgos = null;
+  $pubKey = dkim_dns_record($selector.'._domainkey.'.$domain, $dkimAlgos, $dkimStrict);
   if ($pubKey === false)
    return 7;
   if ($pubKey === 0)
    return 9;
-
+  if ($dkimAlgos !== null)
+  {
+   if (!in_array(strtolower($hAlgo), $dkimAlgos))
+    return 10;
+  }
+  if (array_key_exists('i', $dkimVals))
+  {
+   $iDomain = $dkimVals['i'];
+   if (strpos($iDomain, '@') !== false)
+    $iDomain = substr($iDomain, strrpos($iDomain, '@') + 1);
+   if ($dkimStrict)
+   {
+    if (strtolower($iDomain) !== strtolower($domain))
+     return 8;
+   }
+   else if (strtolower(substr($iDomain, -1 * strlen($domain))) !== strtolower($domain))
+    return 8;
+  }
   $tmphdrs = tempnam($tmp_dir, 'hdr0');
   $fd = fopen($tmphdrs, "w");
   if ($fd)
@@ -367,9 +386,9 @@
   unlink($tmphdrs);
   unlink($tmpcert);
   unlink($tmpsig);
-
   if ($retval != 1)
    return 5;
+  $signerDomain = $domain;
   if ($timeS > 0 && $timeS > time())
    return 2;
   if ($timeF > 0 && $timeF < time())
@@ -379,22 +398,22 @@
   return 0;
  }
 
- function convert_dkim_verify_result_to_displayable_text($retval)
+ function convert_dkim_verify_result_to_displayable_text($retval, $domain)
  {
   sq_change_text_domain('dkim');
   switch ($retval)
   {
-   case 0: $str = _("Valid"); break;
-   case 1: $str = _("Valid - Message is partially signed"); break;
-   case 2: $str = _("Valid - Signature is expired"); break;
-   case 3: $str = _("Invalid - Header is invalid"); break;
-   case 4: $str = _("Invalid - Message has been altered"); break;
-   case 5: $str = _("Invalid - Signature is invalid"); break;
+   case 0: $str = _("Valid")._(" (Signed by ").$domain._(")"); break;
+   case 1: $str = _("Valid")._(" (Signed by ").$domain._(")")._(" - ")._("Message is partially signed"); break;
+   case 2: $str = _("Valid")._(" (Signed by ").$domain._(")")._(" - ")._("Signature is expired"); break;
+   case 3: $str = _("Invalid")._(" - ")._("Header is invalid"); break;
+   case 4: $str = _("Invalid")._(" - ")._("Message has been altered"); break;
+   case 5: $str = _("Invalid")._(" - ")._("Signature is invalid"); break;
    case 6: $str = _("Unverified"); break;
-   case 7: $str = _("Unverified - DNS record unavailable"); break;
-   case 8: $str = _("Invalid - Strict domain failure"); break;
-   case 9: $str = _("Invalid - No compatible key type"); break;
-   case 10: $str = _("Invalid - No compatible hash algorithm"); break;
+   case 7: $str = _("Unverified")._(" - ")._("DNS record unavailable"); break;
+   case 8: $str = _("Invalid")._(" - ")._("Different domain"); break;
+   case 9: $str = _("Invalid")._(" - ")._("No compatible key type"); break;
+   case 10: $str = _("Invalid")._(" - ")._("No compatible hash algorithm"); break;
   }
   sq_change_text_domain('squirrelmail');
   return $str;
@@ -450,10 +469,11 @@
   }
   else
   {
+   $signerDomain = null;
    $hdrs = substr($body, 0, strpos($body, "\r\n\r\n") + 2);
    $body = substr($body, strpos($body, "\r\n\r\n") + 4);
-   $retval = verify_dkim($headerList['dkim-signature'], $hdrs, $body);
-   $sign_result = convert_dkim_verify_result_to_displayable_text($retval);
+   $retval = verify_dkim($headerList['dkim-signature'], $hdrs, $body, $signerDomain);
+   $sign_result = convert_dkim_verify_result_to_displayable_text($retval, $signerDomain);
   }
   sq_change_text_domain('dkim');
   if ($retval < 3)

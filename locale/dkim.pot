@@ -16,32 +16,44 @@ msgstr ""
 msgid "Valid"
 msgstr ""
 
-msgid "Valid - Message is partially signed"
-msgstr ""
-
-msgid "Valid - Signature is expired"
-msgstr ""
-
-msgid "Invalid - Header is invalid"
-msgstr ""
-
-msgid "Invalid - Message has been altered"
-msgstr ""
-
-msgid "Invalid - Signature is invalid"
+msgid "Invalid"
 msgstr ""
 
 msgid "Unverified"
 msgstr ""
 
-msgid "Unverified - DNS record unavailable"
+msgid " (Signed by "
 msgstr ""
 
-msgid "Invalid - Strict domain failure"
+msgid ")"
 msgstr ""
 
-msgid "Invalid - No compatible key type"
+msgid "Message is partially signed"
 msgstr ""
 
-msgid "Invalid - No compatible hash algorithm"
+msgid "Signature is expired"
+msgstr ""
+
+msgid "Header is invalid"
+msgstr ""
+
+msgid "Message has been altered"
+msgstr ""
+
+msgid "Signature is invalid"
+msgstr ""
+
+msgid "DNS record unavailable"
+msgstr ""
+
+msgid "Different domain"
+msgstr ""
+
+msgid "No compatible key type"
+msgstr ""
+
+msgid "No compatible hash algorithm"
+msgstr ""
+
+msgid " - "
 msgstr ""
