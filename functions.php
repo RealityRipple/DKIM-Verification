@@ -103,6 +103,11 @@
     if (!in_array('*', $services) && !in_array('email', $services))
      continue;
    }
+   if (array_key_exists('k', $recVals))
+   {
+    if ($recVals['k'] !== 'rsa' && $recVals['k'] !== 'dsa' && $recVals['k'] !== 'ecdsa256' && $recVals['k'] !=== 'ecdsa384' && $recVals['k'] !== 'ecdsa521')
+     continue;
+   }
    if (array_key_exists('h', $recVals))
    {
     $hashTypes = array();
