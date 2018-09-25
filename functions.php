@@ -66,6 +66,8 @@
    $record = $tRet['txt'];
    if (strpos($record, 'p=') === false)
     continue;
+   if (strpos($record, 'v=') !== false && substr($record, strpos($record, 'v=') + 2, 6) !== 'DKIM1;')
+    continue;
    $record = substr($record, strpos($record, 'p=') + 2);
    if (strpos($record, ';') !== false)
     $record = substr($record, 0, strpos($record, ';'));
