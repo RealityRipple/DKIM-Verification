@@ -56,6 +56,7 @@
 
  function dkim_dns_record($host, &$acceptedHashes, &$strict)
  {
+  $noKey = false;
   $acceptedHashes = null;
   $strict = false;
   $ret = dns_get_record($host, DNS_TXT);
@@ -106,7 +107,10 @@
    if (array_key_exists('k', $recVals))
    {
     if ($recVals['k'] !== 'rsa' && $recVals['k'] !== 'dsa' && $recVals['k'] !== 'ecdsa256' && $recVals['k'] !=== 'ecdsa384' && $recVals['k'] !== 'ecdsa521')
+    {
+     $noKey = true;
      continue;
+    }
    }
    if (array_key_exists('h', $recVals))
    {
@@ -133,6 +137,8 @@
    $record = wordwrap($record, 64, "\r\n", true);
    return "-----BEGIN PUBLIC KEY-----\r\n$record\r\n-----END PUBLIC KEY-----\r\n";
   }
+  if ($noKey)
+   return 0;
   return false;
  }
 
@@ -330,6 +336,8 @@
   $pubKey = dkim_dns_record($selector.'._domainkey.'.$domain);
   if ($pubKey === false)
    return 7;
+  if ($pubKey === 0)
+   return 9;
 
   $tmphdrs = tempnam($tmp_dir, 'hdr0');
   $fd = fopen($tmphdrs, "w");
