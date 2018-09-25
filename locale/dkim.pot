@@ -1,0 +1,38 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: dkim 0.1\n"
+"Report-Msgid-Bugs-To: Andrew Sachen <webmaster@realityripple.com>\n"
+"POT-Creation-Date: 2018-09-25 00:00-0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: Andrew Sachen <webmaster@realityripple.com>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "DKIM"
+msgstr ""
+
+msgid "Valid"
+msgstr ""
+
+msgid "Valid - Message is partially signed"
+msgstr ""
+
+msgid "Valid - Signature is expired"
+msgstr ""
+
+msgid "Invalid - Header is invalid"
+msgstr ""
+
+msgid "Invalid - Message has been altered"
+msgstr ""
+
+msgid "Invalid - Signature is invalid"
+msgstr ""
+
+msgid "Unverified"
+msgstr ""
+
+msgid "Unverified - DNS record unavailable"
+msgstr ""

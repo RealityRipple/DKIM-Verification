@@ -1,0 +1,95 @@
+DKIM Verification plugin for SquirrelMail
+===========================================
+Ver 0.1, 2018/09/25
+
+
+Copyleft  (-) 2018 Andrew Sachen <webmaster@realityripple.com>
+
+
+Description
+===========
+
+This plugin quickly displays the validity of DKIM signed messages
+(those that are signed with a "DKIM-Signature" header).
+
+This plugin requires OpenSSL to be installed, as it does not use the
+OpenSSL extensions of PHP (that is a *feature*, since the PHP extensions
+have been known to be buggy).
+
+Note that this plugin does NOT *generate* DKIM signed emails.
+
+
+Donations
+=========
+
+If you or your company make regular use of this software,
+please consider supporting Open Source development by
+donating to the authors or inquire about hiring them to
+consult on other projects.  Donation/wish list links for
+the author(s) are as follows:
+
+Andrew Sachen: https://realityripple.com/donate.php?itm=Squirrel+DKIM
+
+
+License
+=======
+
+This plugin is unlicensed and can be considered in the public domain
+(see LICENSE for details).
+
+
+Requirements
+============
+
+  * OpenSSL (ALWAYS have the newest version installed!)
+
+  * SquirrelMail version 1.1.1 or above
+
+  * If not using SquirrelMail 1.4.10+ or 1.5.2+,
+    Compatibility plugin version 2.0.7 or above
+
+
+Troubleshooting
+===============
+
+  * Make sure the plugin is configured correctly by browsing to
+    http://your-squirrelmail-location/src/configtest.php
+
+  * If you experience problems related to the programs needed by
+    this plugin (echo and openssl), typing "which echo" and
+    "which openssl" on a command line can help.  This plugin
+    assumes you have these programs installed and available and
+    should only be installed once you have those tools.
+
+  * If changes to the configuration file don't seem to be having any
+    effect, ensure that you are editing the correct configuration
+    file.  If one is located in the main SquirrelMail config directory
+    (named "config_dkim.php"), it will always be used.  Otherwise,
+    "config.php" in the dkim plugin directory will be used.
+
+
+Help Requests
+=============
+
+Before looking for help elsewhere, please try to help yourself:
+
+  * Read the Troubleshooting section herein.
+
+  * Make sure the plugin is configured correctly by browsing to
+    http://your-squirrelmail-location/src/configtest.php
+
+  * Look to see if others have already asked about the same issue.
+    The Issues list on GitHub is probably the best place to do this:
+    https://github.com/RealityRipple/DKIM-Verification/issues
+    You should also try Google or some other search engine.
+
+  * If you don't get any replies in GitHub's Issues section, you are
+    welcome to send a help request to the authors' personal
+    address(es), but please be patient with the mailing list.
+
+
+Change Log
+==========
+
+  v0.1  2018/09/25  Andrew Sachen <webmaster@realityripple.com>
+    * Initial release
