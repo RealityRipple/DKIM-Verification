@@ -64,6 +64,7 @@
    return false;
   if (count($ret) < 1)
    return false;
+  $pubKeys = array();
   foreach ($ret as $tRet)
   {
    $record = $tRet['txt'];
@@ -78,7 +79,11 @@
      if (strpos($kv, '=') === false)
       continue;
      list($lKey, $lVal) = explode('=', $kv, 2);
-     $recVals[strtolower(str_replace(' ', '',$lKey))] = str_replace(' ',  '', $lVal);
+     $lKey = strtolower(str_replace(' ', '',$lKey));
+     $lVal = str_replace(' ',  '', $lVal);
+     if (!array_key_exists($lKey, $recVals))
+      $recVals[$lKey] = array();
+     $recVals[$lKey][] = $lVal;
     }
    }
    else
@@ -88,25 +93,32 @@
     if (strpos($record, '=') === false)
      continue;
     list($lKey, $lVal) = explode('=', $record, 2);
-    $recVals[strtolower(str_replace(' ', '',$lKey))] = str_replace(' ',  '', $lVal);
+    $lKey = strtolower(str_replace(' ', '',$lKey));
+    $lVal = str_replace(' ',  '', $lVal);
+    if (!array_key_exists($lKey, $recVals))
+     $recVals[$lKey] = array();
+    $recVals[$lKey][] = $lVal;
    }
    if (!array_key_exists('p', $recVals))
     continue;
-   if (array_key_exists('v', $recVals) && $recVals['v'] !== 'DKIM1')
+   if (array_key_exists('v', $recVals) && !in_array('DKIM1', $recVals['v']))
     continue;
    if (array_key_exists('s', $recVals))
    {
     $services = array();
-    if (strpos($recVals['s'], ':') === false)
-     $services[] = $recVals['s'];
-    else
-     $services = explode(':', $recVals['s']);
+    foreach ($recVals['s'] as $recSvc)
+    {
+     if (strpos($recSvc, ':') === false)
+      $services[] = $recSvc;
+     else
+      array_push($services, explode(':', $recSvc));
+    }
     if (!in_array('*', $services) && !in_array('email', $services))
      continue;
    }
    if (array_key_exists('k', $recVals))
    {
-    if ($recVals['k'] !== 'rsa' && $recVals['k'] !== 'dsa' && $recVals['k'] !== 'ecdsa256' && $recVals['k'] !== 'ecdsa384' && $recVals['k'] !== 'ecdsa521')
+    if (!in_array('rsa', $recVals['k']) && !in_array('dsa', $recVals['k']) && !in_array('ecdsa256', $recVals['k']) && !in_array('ecdsa384', $recVals['k']) && !in_array('ecdsa521', $recVals['k']))
     {
      $noKey = true;
      continue;
@@ -115,28 +127,36 @@
    if (array_key_exists('h', $recVals))
    {
     $hashTypes = array();
-    if (strpos($recVals['h'], ':') === false)
-     $hashTypes[] = $recVals['h'];
-    else
-     $hashTypes = explode(':', $recVals['h']);
+    foreach ($recVals['h'] as $recHash)
+    {
+     if (strpos($recHash, ':') === false)
+      $hashTypes[] = $recHash;
+     else
+      array_push($hashTypes, explode(':', $recHash));
+    }
     $acceptedHashes = $hashTypes;
    }
    if (array_key_exists('t', $recVals))
    {
     $flags = array();
-    if (strpos($recVals['t'], ':') === false)
-     $flags[] = $recVals['t'];
-    else
-     $flags = explode(':', $recVals['t']);
+    foreach ($recVals['t'] as $recFlag)
+    {
+     if (strpos($recFlag, ':') === false)
+      $flags[] = $recFlag;
+     else
+      array_push($flags, explode(':', $recFlag));
+    }
     if (in_array('s', $flags))
      $strict = true;
    }
-   $record = substr($record, strpos($record, 'p=') + 2);
-   if (strpos($record, ';') !== false)
-    $record = substr($record, 0, strpos($record, ';'));
-   $record = wordwrap($record, 64, "\r\n", true);
-   return "-----BEGIN PUBLIC KEY-----\r\n$record\r\n-----END PUBLIC KEY-----\r\n";
+   foreach ($recVals['p'] as $recKey)
+   {
+    $recKey = wordwrap($recKey, 64, "\r\n", true);
+    $pubKeys[] = "-----BEGIN PUBLIC KEY-----\r\n$recKey\r\n-----END PUBLIC KEY-----\r\n";
+   }
   }
+  if (count($pubKeys) > 0)
+   return $pubKeys;
   if ($noKey)
    return 0;
   return false;
@@ -249,9 +269,9 @@
   else
   {
    if (empty($dkimHeader))
-    return 3;
+    return 0x1001;
    if (strpos($dkimHeader, '=') === false)
-    return 3;
+    return 0x1001;
    list($lKey, $lVal) = explode('=', $dkimHeader, 2);
    $dkimVals[strtolower(str_replace(' ', '',$lKey))] = str_replace(' ',  '', $lVal);
   }
@@ -268,12 +288,13 @@
   if (array_key_exists('d', $dkimVals))
    $domain = $dkimVals['d'];
   if (empty($domain))
-   return 3;
+   return 0x1001;
+  $signerDomain = $domain;
   $selector = '';
   if (array_key_exists('s', $dkimVals))
    $selector = $dkimVals['s'];
   if (empty($selector))
-   return 3;
+   return 0x1001;
   $canon = 'simple/simple';
   if (array_key_exists('c', $dkimVals))
    $canon = $dkimVals['c'];
@@ -287,7 +308,7 @@
   if (array_key_exists('t', $dkimVals))
    $timeS = $dkimVals['t'];
   if (!is_numeric($timeS))
-   return 3;
+   return 0x1001;
   else
    $timeS = intval($timeS);
   $timeF = 0;
@@ -296,12 +317,12 @@
   else
    $timeF = intval($timeF);
   if (!is_numeric($timeF))
-   return 3;
+   return 0x1001;
   $headerOrder = 'From';
   if (array_key_exists('h', $dkimVals))
    $headerOrder = $dkimVals['h'];
   if (empty($headerOrder) || strpos(strtolower($headerOrder), 'from') === false)
-   return 3;
+   return 0x1001;
   $hOrder = array();
   if (strpos($headerOrder, ':') === false)
    $hOrder[] = $headerOrder;
@@ -311,39 +332,39 @@
   if (array_key_exists('bh', $dkimVals))
    $bodyHash = $dkimVals['bh'];
   if (empty($bodyHash))
-   return 3;
+   return 0x1001;
   $signature = '';
   if (array_key_exists('b', $dkimVals))
    $signature = $dkimVals['b'];
   if (empty($signature))
-   return 3;
+   return 0x1001;
   $length = -1;
   if (array_key_exists('l', $dkimVals))
    $length = $dkimVals['l'];
   if (!is_numeric($length))
-   return 3;
+   return 0x1001;
   if (strtolower($bCanon) === 'relaxed')
    $canonBody = dkim_canon_body('r', $message_in, $length);
   else
    $canonBody = dkim_canon_body('s', $message_in, $length);
   $calcHash = base64_encode(hash($hAlgo, $canonBody, true));
   if ($calcHash !== $bodyHash)
-   return 4;
+   return 0x2001;
   if (strtolower($hCanon) === 'relaxed')
    $canonHeader = dkim_canon_header('r', $headers_in, $hOrder);
   else
    $canonHeader = dkim_canon_header('s', $headers_in, $hOrder);
   $dkimStrict = false;
   $dkimAlgos = null;
-  $pubKey = dkim_dns_record($selector.'._domainkey.'.$domain, $dkimAlgos, $dkimStrict);
-  if ($pubKey === false)
-   return 7;
-  if ($pubKey === 0)
-   return 9;
+  $pubKeys = dkim_dns_record($selector.'._domainkey.'.$domain, $dkimAlgos, $dkimStrict);
+  if ($pubKeys === false)
+   return 0x102;
+  if ($pubKeys === 0)
+   return 0x10001;
   if ($dkimAlgos !== null)
   {
    if (!in_array(strtolower($hAlgo), $dkimAlgos))
-    return 10;
+    return 0x20001;
   }
   if (array_key_exists('i', $dkimVals))
   {
@@ -353,10 +374,10 @@
    if ($dkimStrict)
    {
     if (strtolower($iDomain) !== strtolower($domain))
-     return 8;
+     return 0x8001;
    }
    else if (strtolower(substr($iDomain, -1 * strlen($domain))) !== strtolower($domain))
-    return 8;
+    return 0x8001;
   }
   $tmphdrs = tempnam($tmp_dir, 'hdr0');
   $fd = fopen($tmphdrs, "w");
@@ -374,47 +395,67 @@
    fclose($fd);
    chmod($tmpsig, 0600);
   }
-  $tmpcert = tempnam($tmp_dir, 'cert0');
-  $fd = fopen($tmpcert, "w");
-  if ($fd)
+  $retval = 0;
+  foreach ($pubKeys as $pubKey)
   {
-   $len = fwrite($fd, $pubKey);
-   fclose($fd);
-   chmod($tmpcert, 0600);
+   $tmpcert = tempnam($tmp_dir, 'cert0');
+   $fd = fopen($tmpcert, "w");
+   if ($fd)
+   {
+    $len = fwrite($fd, $pubKey);
+    fclose($fd);
+    chmod($tmpcert, 0600);
+   }
+   exec("$openssl_cmds --verify-dkim-msg $hAlgo $tmphdrs $tmpcert $tmpsig 2>/dev/null", $message_out, $retval);
+   unlink($tmpcert);
+   if ($retval == 1)
+    break;
   }
-  exec("$openssl_cmds --verify-dkim-msg $hAlgo $tmphdrs $tmpcert $tmpsig 2>/dev/null", $message_out, $retval);
   unlink($tmphdrs);
-  unlink($tmpcert);
   unlink($tmpsig);
   if ($retval != 1)
-   return 5;
-  $signerDomain = $domain;
+   return 0x4001;
   if ($timeS > 0 && $timeS > time())
-   return 2;
+   return 0x20;
   if ($timeF > 0 && $timeF < time())
-   return 2;
+   return 0x20;
   if (intval($length) > -1)
-   return 1;
-  return 0;
+   return 0x10;
+  return 0x00;
  }
 
- function convert_dkim_verify_result_to_displayable_text($retval, $domain)
+ function convert_dkim_verify_result_to_displayable_text($retval)
  {
   sq_change_text_domain('dkim');
-  switch ($retval)
-  {
-   case 0: $str = _("Valid")._(" (Signed by ").$domain._(")"); break;
-   case 1: $str = _("Valid")._(" (Signed by ").$domain._(")")._(" - ")._("Message is partially signed"); break;
-   case 2: $str = _("Valid")._(" (Signed by ").$domain._(")")._(" - ")._("Signature is expired"); break;
-   case 3: $str = _("Invalid")._(" - ")._("Header is invalid"); break;
-   case 4: $str = _("Invalid")._(" - ")._("Message has been altered"); break;
-   case 5: $str = _("Invalid")._(" - ")._("Signature is invalid"); break;
-   case 6: $str = _("Unverified"); break;
-   case 7: $str = _("Unverified")._(" - ")._("DNS record unavailable"); break;
-   case 8: $str = _("Invalid")._(" - ")._("Different domain"); break;
-   case 9: $str = _("Invalid")._(" - ")._("No compatible key type"); break;
-   case 10: $str = _("Invalid")._(" - ")._("No compatible hash algorithm"); break;
-  }
+  $str = '';
+  if (($retval & 0x01) == 0x01)
+   $str = _("Invalid");
+  else if (($retval & 0x02) == 0x02)
+   $str = _("Unverified");
+  else if (($retval & 0x04) == 0x04)
+   $str = _("Invalid");
+  else if (($retval & 0x08) == 0x08)
+   $str = _("Invalid");
+  else
+   $str = _("Valid");
+  if (($retval & 0x10) == 0x10)
+   $str.= _(" - ")._("Message is partially signed");
+  if (($retval & 0x20) == 0x20)
+   $str.= _(" - ")._("Signature is expired");
+  if (($retval & 0x100) == 0x100)
+   $str.= _(" - ")._("DNS record unavailable");
+  if (($retval & 0x1000) == 0x1000)
+   $str.= _(" - ")._("Header is invalid");
+  if (($retval & 0x2000) == 0x2000)
+   $str.= _(" - ")._("Message has been altered");
+  if (($retval & 0x4000) == 0x4000)
+   $str.= _(" - ")._("Signature is invalid");
+  if (($retval & 0x8000) == 0x8000)
+   $str.= _(" - ")._("Different domain");
+  if (($retval & 0x10000) == 0x10000)
+   $str.= _(" - ")._("No compatible key type");
+  if (($retval & 0x20000) == 0x20000)
+   $str.= _(" - ")._("No compatible hash algorithm");
   sq_change_text_domain('squirrelmail');
   return $str;
  }
@@ -447,7 +488,11 @@
    if (strpos($hInfo, ': ') === false)
     continue;
    list($hKey, $hVal) = explode(': ', $hInfo, 2);
-   $hdrs[strtolower($hKey)] = $hVal;
+   $hKey = strtolower(str_replace(' ', '',$hKey));
+   $hVal = str_replace(' ',  '', $hVal);
+   if (!array_key_exists($hKey, $hdrs))
+    $hdrs[$hKey] = array();
+   $hdrs[$hKey][] = $hVal;
   }
   return $hdrs;
  }
@@ -462,51 +507,57 @@
    return;
   dkim_working_directory_init();
   $body = dkim_fetch_full_body($imapConnection, $passed_id);
-  if (strpos($body, "\r\n\r\n") === false)
-  {
-   $retval = 6;
-   $sign_result = "Error Reading Message: $body";
-  }
-  else
+  $output = '';
+  foreach ($headerList['dkim-signature'] as $headerSig)
   {
    $signerDomain = null;
-   $hdrs = substr($body, 0, strpos($body, "\r\n\r\n") + 2);
-   $body = substr($body, strpos($body, "\r\n\r\n") + 4);
-   $retval = verify_dkim($headerList['dkim-signature'], $hdrs, $body, $signerDomain);
-   $sign_result = convert_dkim_verify_result_to_displayable_text($retval, $signerDomain);
-  }
-  sq_change_text_domain('dkim');
-  if ($retval < 3)
-   $sign_verified = TRUE;
-  else
-   $sign_verified = FALSE;
-  if (check_sm_version(1, 5, 2))
-  {
-   global $oTemplate;
-   $oTemplate->assign('dkim_row_highlite_color', $row_highlite_color);
-   $oTemplate->assign('dkim_sign_verified', $sign_verified);
-   $oTemplate->assign('dkim_sign_result', $sign_result, FALSE);
-   $output = $oTemplate->fetch('plugins/dkim/dkim.tpl');
-   return array('read_body_header' => $output);
-  }
-  else
-  {
-   $colortag1 = '';
-   $colortag2 = '';
-   if (!$sign_verified)
+   if (strpos($body, "\r\n\r\n") === false)
    {
-      $colortag1 = "<font color=\"$color[2]\"><b>";
-      $colortag2 = '</b></font>';
+    $retval = 6;
+    $sign_result = "Error Reading Message: $body";
    }
-   echo "      <tr bgcolor=\"$row_highlite_color\">\n"
-      . "        <td width=\"20%\" align=\"right\" valign=\"top\">\n<b>"
-      . _("DKIM")
-      . "        </b></td><td width=\"80%\" align=\"left\" valign=\"top\">\n"
-      . "          $colortag1 $sign_result$colortag2\n"
-      . "        </td>\n"
-      . "      </tr>\n";
+   else
+   {
+    $hdrs = substr($body, 0, strpos($body, "\r\n\r\n") + 2);
+    $bOut = substr($body, strpos($body, "\r\n\r\n") + 4);
+    $retval = verify_dkim($headerSig, $hdrs, $bOut, $signerDomain);
+    $sign_result = convert_dkim_verify_result_to_displayable_text($retval);
+   }
+   sq_change_text_domain('dkim');
+   if ($retval < 3)
+    $sign_verified = TRUE;
+   else
+    $sign_verified = FALSE;
+   if (check_sm_version(1, 5, 2))
+   {
+    global $oTemplate;
+    $oTemplate->assign('dkim_row_highlite_color', $row_highlite_color);
+    $oTemplate->assign('dkim_sign_domain', $signerDomain);
+    $oTemplate->assign('dkim_sign_verified', $sign_verified);
+    $oTemplate->assign('dkim_sign_result', $sign_result, FALSE);
+    $output.= $oTemplate->fetch('plugins/dkim/dkim.tpl');
+   }
+   else
+   {
+    $colortag1 = '';
+    $colortag2 = '';
+    if (!$sign_verified)
+    {
+       $colortag1 = "<font color=\"$color[2]\"><b>";
+       $colortag2 = '</b></font>';
+    }
+    echo "      <tr bgcolor=\"$row_highlite_color\">\n"
+       . "        <td width=\"20%\" align=\"right\" valign=\"top\">\n<b>"
+       . _("DKIM")
+       . "        </b></td><td width=\"80%\" align=\"left\" valign=\"top\">\n"
+       . "          $colortag1 $sign_result$colortag2\n"
+       . "        </td>\n"
+       . "      </tr>\n";
+   }
+   sq_change_text_domain('squirrelmail');
   }
-  sq_change_text_domain('squirrelmail');
+  if ($output !== '')
+   return array('read_body_header' => $output);
  }
 
  function dkim_working_directory_init()

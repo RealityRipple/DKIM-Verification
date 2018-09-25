@@ -10,7 +10,7 @@ msgstr ""
 "Content-Type: text/plain; charset=CHARSET\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid "DKIM"
+msgid " DKIM"
 msgstr ""
 
 msgid "Valid"
@@ -20,12 +20,6 @@ msgid "Invalid"
 msgstr ""
 
 msgid "Unverified"
-msgstr ""
-
-msgid " (Signed by "
-msgstr ""
-
-msgid ")"
 msgstr ""
 
 msgid "Message is partially signed"
