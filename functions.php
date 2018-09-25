@@ -248,9 +248,9 @@
   else
   {
    if (empty($dkimHeader))
-    continue;
+    return 3;
    if (strpos($dkimHeader, '=') === false)
-    continue;
+    return 3;
    list($lKey, $lVal) = explode('=', $dkimHeader, 2);
    $dkimVals[strtolower(str_replace(' ', '',$lKey))] = str_replace(' ',  '', $lVal);
   }
