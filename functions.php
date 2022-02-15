@@ -67,7 +67,7 @@
    do_err('DKIM Verification plugin had a problem executing the openssl program at ./openssl-cmds.sh: '.$res, false);
    return true;
   }
-  if (preg_match("/^OpenSSL.*1\.0\.[1-9]/", $res) == 0)
+  if (preg_match("/^OpenSSL.*1\.0\.[1-9]/", $res) == 0 && preg_match("/^OpenSSL.*1\.[1-9]\.[0-9]/", $res) == 0)
   {
    do_err('DKIM Verfication plugin requires a newer release of openssl, actual release: '.$res.'.', false);
    return true;
