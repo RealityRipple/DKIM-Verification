@@ -659,6 +659,8 @@
     if (strpos($fromAddr, '@') === false)
      continue;
     $fDomain = substr($fromAddr, strpos($fromAddr, '@') + 1);
+    if (substr($fDomain, -1) === '>')
+     $fDomain = substr($fDomain, 0, -1);
     $fromList[] = strtolower($fDomain);
     $dPol = dkim_dns_policy('_domainkey.'.$fDomain);
     $dnsPols[strtolower($fDomain)] = $dPol;
